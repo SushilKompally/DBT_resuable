@@ -1,0 +1,9 @@
+version: 2
+ 
+sources:
+  - name: salesforce_bronze
+    database:  SALESFORCE_DB  
+    schema: BRONZE        
+    tables:
+      - name: account
+      - name: CAMPAIGN
