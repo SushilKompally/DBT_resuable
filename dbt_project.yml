@@ -36,8 +36,8 @@ clean-targets: # directories to be removed by `dbt clean`
 models:
   DBT_reusable:
     Salesforce:
-        Silver:
-          +database:  "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
-          +schema: SILVER
-          +materialized: table
+      Silver:
+        +database:  "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
+        +schema: SILVER
+        +materialized: table
 
