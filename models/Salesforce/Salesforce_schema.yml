@@ -6,4 +6,16 @@ sources:
     schema: BRONZE        
     tables:
       - name: account
-      - name: CAMPAIGN
+      - name: Campaign
+      - name: User
+      - name: Userrole
+      - name: case
+      - name: contact
+      - name: lead
+      - name: opportunity
+      - name: opportunity_history
+      - name: product
+      - name: quote
+      - name: quote_lineitem
+      - name: task_event
+      
