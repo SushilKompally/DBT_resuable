@@ -40,4 +40,14 @@ models:
         +database:  "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
         +schema: SILVER
         +materialized: table
+      Gold:
+        +database:  "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
+        +schema: GOLD
+        +materialized: table
 
+snapshots:
+  DBT_reusable:
+    Salesforce:
+      Gold:
+        target_database: "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
+        target_schema: GOLD
