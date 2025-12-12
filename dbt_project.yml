@@ -1,7 +1,7 @@
 # Name your project! Project names should contain only lowercase characters
 # and underscores. A good package name should reflect your organization's
 # name or the intended use of these models
-name: "DBT_reusable"
+name: "dbt_reusable"
 version: "1.0.0"
 config-version: 2
 
@@ -34,20 +34,23 @@ clean-targets: # directories to be removed by `dbt clean`
 # using the `{{ config(...) }}` macro.
 
 models:
-  DBT_reusable:
-    Salesforce:
-      Silver:
+  dbt_reusable:
+    salesforce:
+      silver:
         +database:  "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
-        +schema: SILVER
-        +materialized: table
-      Gold:
+        +schema: silver
+        +materialized: "incremental"
+      gold:
         +database:  "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
-        +schema: GOLD
-        +materialized: table
-
+        +schema: gold
+        +materialized: "incremental"
+   
 snapshots:
-  DBT_reusable:
-    Salesforce:
-      Gold:
+  dbt_reusable:
+    salesforce:
+      gold:
         target_database: "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
-        target_schema: GOLD
+        target_schema: test_gold
+        strategy: timestamp
+        invalidate_hard_deletes: true
+   

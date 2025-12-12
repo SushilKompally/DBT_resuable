@@ -21,6 +21,6 @@
     END_DATE,
     OWNER_USER_ID,
     LAST_MODIFIED_DATE
- FROM {{ ref('campaign') }}   -- source from your Silver model
+ FROM {{ ref('campaign') }}   
 {% endsnapshot %}
 

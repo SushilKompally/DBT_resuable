@@ -10,7 +10,7 @@
 WITH RAW AS (
 
     SELECT *
-    FROM {{ source("salesforce_bronze", "User") }}
+    FROM {{ source("salesforce_bronze", "user") }}
 
     {% if is_incremental() %}
         WHERE CAST(LASTMODIFIEDDATE AS TIMESTAMP_NTZ) > (

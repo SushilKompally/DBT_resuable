@@ -28,8 +28,8 @@ LEFT JOIN {{ ref('dim_contact_snapshot') }} dc
 LEFT JOIN {{ ref('dim_user_snapshot') }} du 
     ON sc.owner_user_id = du.sf_user_id 
     AND du.dbt_valid_to IS NULL
-    LEFT JOIN {{ ref('dim_case_status') }} dcs 
-           ON sc.status = dcs.status_name
+LEFT JOIN {{ ref('dim_case_status') }} dcs 
+    ON sc.status = dcs.status_name
 LEFT JOIN {{ ref('dim_dates') }} dd1 
     ON TO_NUMBER(TO_VARCHAR(CAST(sc.created_date AS DATE), 'YYYYMMDD')) = dd1.date_key
 LEFT JOIN {{ ref('dim_dates') }} dd2 
@@ -37,6 +37,6 @@ LEFT JOIN {{ ref('dim_dates') }} dd2
 
 {% if is_incremental() %}
     -- Filter to only new or updated records
-    WHERE sc._fivetran_synced > (SELECT MAX(_fivetran_synced) FROM {{ this }})
+    WHERE sc.LAST_MODIFIED_DATE > (SELECT MAX(LAST_MODIFIED_DATE) FROM {{ this }})
 {% endif %}
 
