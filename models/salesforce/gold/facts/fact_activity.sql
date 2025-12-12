@@ -22,7 +22,7 @@ LEFT JOIN  {{ ref('dim_user_snapshot') }} du
 
  {% if is_incremental() %}
     WHERE CAST(e.silver_load_date AS TIMESTAMP_NTZ) > (
-        SELECT COALESCE(MAX(silver_load_date_ntz), '1900-01-01'::TIMESTAMP_NTZ)
+        SELECT COALESCE(MAX(LAST_MODIFIED_DATE), '1900-01-01'::TIMESTAMP_NTZ)
         FROM {{ this }}
     )
     {% endif %}

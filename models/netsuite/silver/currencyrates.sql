@@ -1,7 +1,7 @@
 {{
     config(
         materialized="incremental",
-        unique_key="USER_ROLE_ID",
+        unique_key="CURRENCY_RATE_ID",
         incremental_strategy="merge",
         on_schema_change="sync_all_columns",
     )
@@ -10,7 +10,7 @@
 WITH RAW AS (
 
     SELECT *
-    FROM {{ source("salesforce_bronze", "Userrole") }}
+    FROM {{ source("netsuite_bronze", "currencyrates") }}
 
     {% if is_incremental() %}
         WHERE CAST(LASTMODIFIEDDATE AS TIMESTAMP_NTZ) > (
@@ -28,18 +28,15 @@ WITH RAW AS (
     ),
 
     CLEANED AS (
-    SELECT 
-    Id               AS USER_ROLE_ID,
-    Name             AS NAME,
-    DeveloperName    AS DEVELOPER_NAME,
-    ParentRoleId     AS PARENT_ROLE_ID,
-    RollupDescription AS ROLLUP_DESCRIPTION,
-    BusinessHoursId  AS BUSINESS_HOURS_ID,
-    ForecastUserId   AS FORECAST_USER_ID,
-    CreatedDate      AS CREATED_DATE,
-    LastModifiedDate AS LAST_MODIFIED_DATE,
-    CURRENT_TIMESTAMP() AS SILVER_LOAD_DATE
-      FROM RAW
+          SELECT
+            CAST(currencyrate_id AS INT) AS CURRENCY_RATE_ID,
+            CAST(date_effective AS DATE) AS EFFECTIVE_DATE, 
+            CAST(date_last_modified AS DATE) AS LAST_MODIFIED_DATE, 
+            CAST(exchange_rate AS INT) AS EXCHANGE_RATE,
+            externalId AS EXTERNALID,
+            CAST(transactionCurrency AS INT) AS TRANSACTION_CURRENCY, 
+            current_timestamp() AS SILVER_LOAD_DATE
+          FROM RAW
     )
 
 SELECT *

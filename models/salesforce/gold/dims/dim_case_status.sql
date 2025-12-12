@@ -7,6 +7,7 @@
 
 WITH distinct_cases AS (
     SELECT DISTINCT
+        CASE_ID,
         STATUS,
         IS_CLOSED
     FROM {{ ref('case') }}

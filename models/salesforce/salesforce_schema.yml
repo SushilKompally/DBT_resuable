@@ -2,13 +2,13 @@ version: 2
  
 sources:
   - name: salesforce_bronze
-    database:  SALESFORCE_DB  
-    schema: BRONZE        
+    database:  salesforce_db  
+    schema: bronze        
     tables:
       - name: account
-      - name: Campaign
-      - name: User
-      - name: Userrole
+      - name: campaign
+      - name: user
+      - name: userrole
       - name: case
       - name: contact
       - name: lead
@@ -18,4 +18,5 @@ sources:
       - name: quote
       - name: quote_lineitem
       - name: task_event
+     
       

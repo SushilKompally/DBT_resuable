@@ -25,6 +25,6 @@
     SHIPPING_CITY,
     CREATED_DATE,
     LAST_MODIFIED_DATE
-FROM {{ ref('Account') }}   -- source from your Silver model
+FROM {{ ref('account') }}   
 {% endsnapshot %}
 

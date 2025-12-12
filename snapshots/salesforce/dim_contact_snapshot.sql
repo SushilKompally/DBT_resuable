@@ -22,7 +22,7 @@
     c.CREATED_DATE,
     c.LAST_MODIFIED_DATE
 FROM {{ ref('contact') }} c
-LEFT JOIN {{ ref('Account') }} da
+LEFT JOIN {{ ref('account') }} da
     ON c.ACCOUNT_ID = da.ACCOUNT_ID   
 {% endsnapshot %}
 

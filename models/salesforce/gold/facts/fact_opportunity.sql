@@ -31,5 +31,5 @@ LEFT JOIN {{ ref('dim_dates') }} dd
        ON TO_NUMBER(TO_VARCHAR(CAST(so.close_date AS DATE), 'YYYYMMDD')) = dd.date_key
 
 {% if is_incremental() %}
-    WHERE so.LAST_MODIFIED_DATE > (SELECT MAX(LAST_MODIFIED_DATE) FROM {{ this }})  -- Filtering only new or updated records
+    WHERE so.LAST_MODIFIED_DATE > (SELECT MAX(LAST_MODIFIED_DATE) FROM {{ this }})  
 {% endif %}
