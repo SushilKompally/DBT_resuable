@@ -1,9 +1,9 @@
 
  
-{% macro incremental_where(source_ts_col, target_ts_col, lookback_days=1, target_relation=None) %}
+{% macro incremental_filter(source_ts_col, target_ts_col, lookback_days=1, target_relation=None) %}
 
 {% if is_incremental() %}
-  WHERE {{ source_ts_col }}::timestamp_ntz >
+  AND {{ source_ts_col }}::timestamp_ntz >
     (
       SELECT dateadd(
         day,

@@ -1,8 +1,10 @@
 
-{% macro source_data(tool_name="datastream", record_creation_column="inserted_at") -%}
+{% macro source_metadata(tool_name="fivetran", record_creation_column="lastmodifieddate") -%}
 
     {% if tool_name == "fivetran" -%}
-        _fivetran_synced as _source_timestamp, _fivetran_deleted as is_deleted
+         LastModifiedDate AS _source_timestamp,
+         COALESCE(TRY_CAST(ISDELETED AS BOOLEAN), FALSE) AS is_deleted
+
 
     {%- elif tool_name == "stitch" -%}
         _sdc_received_at as _source_timestamp,
@@ -27,9 +29,6 @@
             timestamp_diff(timestamp_millis(datastream_metadata.source_timestamp), {{ record_creation_column }}, day) <= 90
             and datastream_metadata.change_type = 'DELETE'
         ) as is_deleted
-
-    {%- elif tool_name == "snowflake" -%}
-        cast({{ record_creation_column }} as timestamp_ntz) as _source_timestamp,
         
     {%- endif %}
 
