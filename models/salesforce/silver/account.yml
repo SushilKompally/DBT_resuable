@@ -68,3 +68,5 @@ models:
         data_type: timestamp_ntz
       - name: created_by_id
         data_type: varchar
+      - name: silver_load_date
+        data_type: timestamp_ntz

@@ -1,5 +1,6 @@
+
 {# ---------------------------------------------------------
-# Strings: trim + NULL if empty 
+# Strings: trim + NULL if empty
 # --------------------------------------------------------- #}
 {% macro clean_string(col, tool_name='snowflake') -%}
 nullif(trim(to_varchar({{ col }})), '')
@@ -11,8 +12,8 @@ lower(nullif(trim(to_varchar({{ col }})), ''))
 
 
 {# ---------------------------------------------------------
-# Numerics: safe integer/decimal 
-# # --------------------------------------------------------- #}
+# Numerics: safe integer/decimal
+# --------------------------------------------------------- #}
 {% macro safe_integer(col, precision=38, scale=3, tool_name='snowflake') -%}
 try_to_number({{ col }}, {{ precision }}, {{ scale }})
 {%- endmacro %}
@@ -23,23 +24,25 @@ try_to_decimal({{ col }}, {{ precision }}, {{ scale }})
 
 
 {# ---------------------------------------------------------
-# Date:  guard blanks/invalid
+# Date: guard blanks/invalid and cutoff
 # --------------------------------------------------------- #}
 {% macro safe_date(col, cutoff_date="1900-01-01", tool_name='snowflake') -%}
 case
+  when nullif(trim({{ col }}), '') is null then null
   when try_to_date({{ col }}) is null then null
   when try_to_date({{ col }}) <= to_date('{{ cutoff_date }}') then null
-  else to_date({{ col }})
+  else try_to_date({{ col }})
 end
 {%- endmacro %}
 
 
 {# ---------------------------------------------------------
-# Timestamp (TIMESTAMP_NTZ): m 
+# Timestamp (TIMESTAMP_NTZ): guard blanks/invalid
 # --------------------------------------------------------- #}
 {% macro safe_timestamp_ntz(col, tool_name='snowflake') -%}
 case
-  when try_to_timestamp_ntz({{ col }})  when try_to_timestamp_ntz({{ col }}) is null then null
+  when nullif(trim({{ col }}), '') is null then null
+  when try_to_timestamp_ntz({{ col }}) is null then null
   else try_to_timestamp_ntz({{ col }})
 end
 {%- endmacro %}

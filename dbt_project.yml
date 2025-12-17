@@ -33,17 +33,32 @@ clean-targets: # directories to be removed by `dbt clean`
 # continue to be built as views. These settings can be overridden in the individual model files
 # using the `{{ config(...) }}` macro.
 
+
+ 
+# Global variables (vars) 
+
+vars:
+    tool_name: "{{ env_var('TOOL_NAME', 'fivetran') }}"
+    record_creation_column:  "{{ env_var('RECORD_CREATION_COLUMN', 'lastmodifieddate') }}"
+
+# Incremental filter (vars)
+
+    source_record_creation_column: "{{ env_var('RECORD_CREATION_COLUMN', 'lastmodifieddate') }}"
+    silver_target_timestamp_col: "{{ env_var('TARGET_TIMESTAMP_COL', 'last_modified_date') }}"
+
 models:
   dbt_reusable:
     salesforce:
       silver:
         +database:  "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
-        +schema: silver
+        +schema: "{{ env_var('DBT_SILVER_SCHEMA', 'SILVER') }}"
         +materialized: "incremental"
         +on_schema_change: append_new_columns
+        
+        
       gold:
         +database:  "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
-        +schema: gold
+        +schema: "{{ env_var('DBT_GOLD_SCHEMA', 'TEST_GOLD') }}"
         +materialized: "incremental"
         +on_schema_change: sync_all_columns
         
@@ -53,7 +68,9 @@ snapshots:
     salesforce:
       gold:
         target_database: "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
-        target_schema: test_gold
+        target_schema: "{{ env_var('DBT_SNAPSHOT_SCHEMA', 'TEST_GOLD') }}"
         strategy: timestamp
         invalidate_hard_deletes: true
    
+
+

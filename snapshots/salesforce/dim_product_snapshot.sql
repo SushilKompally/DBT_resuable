@@ -2,23 +2,20 @@
 {% snapshot dim_product_snapshot %}
 {{
   config(
-    target_database='SALESFORCE_DB',
-    target_schema='TEST_GOLD',
-    unique_key='SF_PRODUCT_ID',
+    unique_key='sf_product_id',
     strategy='timestamp',
     updated_at='last_modified_date',
-    invalidate_hard_deletes=true
   )
 }}
 
 
   SELECT
-    PRODUCT_ID AS SF_PRODUCT_ID,
-    NAME ,
-    PRODUCT_CODE,
-    FAMILY,
-    IS_ACTIVE,
-    LAST_MODIFIED_DATE
+    product_id AS sf_product_id,
+    name,
+    product_code,
+    family,
+    is_active,
+    last_modified_date
 FROM {{ ref('product') }} 
 {% endsnapshot %}
 
