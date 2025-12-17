@@ -7,7 +7,7 @@
 -- Purpose:
 --     This script performs an incremental load from the Bronze layer to the
 --     Silver layer for the acount table in the Salesforce data pipeline.
--- Data source version: 
+-- Data source version: v62.0
 -- Change History:
 --     15-dec-2025 - Initial creation - Sushil Kompally
 */

@@ -6,7 +6,7 @@
 -- Author: Sushil Kumar Kompally
 -- Purpose:
 --     Incremental load from Bronze to Silver for the campaign table.
--- Data source version:
+-- Data source version:v62.0
 -- Change History:
 --     16-dec-2025 - Initial creation - Sushil Kompally
 */
