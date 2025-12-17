@@ -12,7 +12,7 @@ WITH opportunity_base AS (
         so.stage_name,
         so.amount   AS amount,
         cast(so.close_date AS date)  AS close_date,
-        cast(so.last_modified_date AS timestamp_ntz) AS base_last_modified_date
+        cast(so.silver_load_date AS timestamp_ntz) AS base_last_modified_date
     FROM {{ ref('opportunity') }} so
 ),
 
@@ -62,7 +62,7 @@ final AS (
     
     {% if is_incremental() %}
       WHERE change_ts > (
-        SELECT coalesce(max(last_modified_date), to_timestamp_ntz('1900-01-01'))
+        SELECT coalesce(max(silver_load_date), to_timestamp_ntz('1900-01-01'))
         FROM {{ this }}
        )
     {% endif %}
@@ -71,3 +71,6 @@ final AS (
 
 SELECT *
 FROM final
+
+
+

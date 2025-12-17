@@ -1,0 +1,59 @@
+
+# ------------------------------
+# Global Sqlfluff configuration
+# ------------------------------
+[sqlfluff]
+dialect = snowflake                 # Use Snowflake grammar
+templater = dbt                     # Render dbt/Jinja before linting
+max_line_length = 120               # Soft line-length target
+large_file_skip_byte_limit = 0      # Lint all files; don't skip big ones
+exclude_rules = structure.column_order  # Keep your PK/FK/NUMERIC/DETAILS grouping
+
+# ------------------------------
+# dbt templater settings
+# ------------------------------
+[sqlfluff:templater:dbt]
+project_dir = ./                    # Path to your dbt project root (where dbt_project.yml resides)
+# profiles_dir = ~/.dbt             # Uncomment if your profiles.yml is there (or set custom path)
+
+# ------------------------------
+# Jinja templater settings
+# ------------------------------
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = True           # Use real dbt macros/functions
+# IMPORTANT: Do NOT define stub macros here when using templater=dbt; let dbt provide real ones.
+
+# ------------------------------
+# Style rules
+# ------------------------------
+[sqlfluff:indentation]
+tab_space_size = 2
+allow_implicit_indents = True       # Helpful for long macro calls / SELECT lists
+
+# Keywords capitalization (SELECT, FROM, WHERE, CASE, etc.)
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+
+# Function names (TRY_TO_DECIMAL, TO_TIMESTAMP_NTZ, GREATEST, NVL, etc.)
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = upper
+
+# Data types (VARCHAR, NUMBER(18,2), TIMESTAMP_NTZ, DATE)
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = upper
+
+# Literals (NULL, TRUE, FALSE)
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = upper
+
+# Comma style (Snowflake is permissive; trailing commas keep diffs cleaner)
+[sqlfluff:rules:comma_style]
+comma_style = trailing
+
+# Aliasing (AS is optional in Snowflake; enforce for readability on columns)
+[sqlfl[sqlfluff:rules:aliasing]
+require_as_for_column_aliases = True
+require_as_for_table_aliases = False
+
+# Optional: quoted identifiers—keep strict to avoid accidental naked strings
+[sqlfluff:rules:quoted_literals]

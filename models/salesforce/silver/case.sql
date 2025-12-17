@@ -1,52 +1,67 @@
-{{
-    config(
-        materialized="incremental",
-        unique_key="CASE_ID",
-        incremental_strategy="merge",
-        on_schema_change="sync_all_columns",
-    )
-}}
 
-WITH RAW AS (
+/*
+-- Description: Incremental Load Script for Silver Layer - case Table
+-- Script Name: silver_case.sql
+-- Created on: 16-dec-2025
+-- Author: Sushil Kumar Kompally
+-- Purpose:
+--     Incremental load from Bronze to Silver for the case table.
+-- Data source version:
+-- Change History:
+--     16-dec-2025 - Initial creation - Sushil Kompally
+*/
 
-    SELECT *
-    FROM {{ source("salesforce_bronze", "case") }}
+{{ config(
+    unique_key='case_id',
+    incremental_strategy='merge',
+) }}
 
-    {% if is_incremental() %}
-        WHERE CAST(LASTMODIFIEDDATE AS TIMESTAMP_NTZ) > (
-            SELECT DATEADD(
-                DAY,
-                -1,
-                COALESCE(MAX(LAST_MODIFIED_DATE), '1900-01-01'::TIMESTAMP_NTZ)
-            )
-            FROM {{ this }}
-        )
-        AND 1 = 1
-    {% else %}
-        WHERE 1 = 1
-    {% endif %}
-    ),
 
-    CLEANED AS (
-        SELECT 
-    
-    Id               AS CASE_ID,
-    AccountId        AS ACCOUNT_ID,
-    ContactId        AS CONTACT_ID,
-    OwnerId          AS OWNER_USER_ID,
-    Status           AS STATUS,
-    Priority         AS PRIORITY,
-    Origin           AS ORIGIN,
-    Reason           AS REASON,
-    Subject          AS SUBJECT,
-    Description      AS DESCRIPTION,
-    CreatedDate      AS CREATED_DATE,
-    LastModifiedDate AS LAST_MODIFIED_DATE,
-    ClosedDate       AS CLOSED_DATE,
-    IsClosed         AS IS_CLOSED,
-    CURRENT_TIMESTAMP() AS SILVER_LOAD_DATE
-          FROM RAW
-    )
+
+WITH raw AS (
+
+  SELECT
+    *,
+    {{ source_metadata() }}  
+  FROM {{ source('salesforce_bronze', 'case') }}
+  WHERE 1=1
+  {{ incremental_filter() }}  
+
+),
+
+cleaned AS (
+
+  SELECT
+    -- PRIMARY KEY
+    id AS case_id,
+
+    -- FOREIGN KEYS
+    accountid AS account_id,
+    contactid AS contact_id,
+    ownerid AS owner_user_id,
+
+    -- DETAILS (strings cleaned)
+    {{ clean_string('status') }}      AS status,
+    {{ clean_string('priority') }}    AS priority,
+    {{ clean_string('origin') }}      AS origin,
+    {{ clean_string('reason') }}      AS reason,
+    {{ clean_string('subject') }}     AS subject,
+    {{ clean_string('description') }} AS description,
+
+    -- DATES / TIMESTAMPS
+    createddate     AS created_date,
+    lastmodifieddate AS last_modified_date,
+    closeddate      AS closed_date,
+
+    -- FLAGS / METADATA
+    isclosed    AS is_closed,
+    is_deleted,
+
+    -- AUDIT
+    current_timestamp()::timestamp_ntz           AS silver_load_date,
+
+  FROM raw
+)
 
 SELECT *
-FROM CLEANED
+FROM cleaned

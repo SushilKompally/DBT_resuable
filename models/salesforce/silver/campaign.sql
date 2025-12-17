@@ -1,51 +1,71 @@
-{{
-    config(
-        materialized="incremental",
-        unique_key="CAMPAIGN_ID",
-        incremental_strategy="merge",
-        on_schema_change="sync_all_columns",
-    )
-}}
 
-WITH RAW AS (
+/*
+-- Description: Incremental Load Script for Silver Layer - campaign Table
+-- Script Name: silver_campaign.sql
+-- Created on: 16-dec-2025
+-- Author: Sushil Kumar Kompally
+-- Purpose:
+--     Incremental load from Bronze to Silver for the campaign table.
+-- Data source version:v62.0
+-- Change History:
+--     16-dec-2025 - Initial creation - Sushil Kompally
+*/
 
-    SELECT *
-    FROM {{ source("salesforce_bronze", "campaign") }}
+{{ config(
+    materialized='incremental',
+    unique_key='campaign_id',
+    incremental_strategy='merge',
+    on_schema_change='append_new_columns'
+) }}
 
-    {% if is_incremental() %}
-        WHERE CAST(LASTMODIFIEDDATE AS TIMESTAMP_NTZ) > (
-            SELECT DATEADD(
-                DAY,
-                -1,
-                COALESCE(MAX(LAST_MODIFIED_DATE), '1900-01-01'::TIMESTAMP_NTZ)
-            )
-            FROM {{ this }}
-        )
-        AND 1 = 1
-    {% else %}
-        WHERE 1 = 1
-    {% endif %}
-    ),
 
-    CLEANED AS (
-        SELECT 
-    Id                AS CAMPAIGN_ID,
-    Name              AS NAME,
-    TYPE              AS ENTITY_TYPE,
-    Status            AS STATUS,
-    StartDate         AS START_DATE,
-    EndDate           AS END_DATE,
-    ExpectedRevenue   AS EXPECTED_REVENUE,
-    BudgetedCost      AS BUDGETED_COST,
-    ActualCost        AS ACTUAL_COST,
-    NumberSent        AS NUMBER_SENT,
-    OwnerId           AS OWNER_USER_ID,
-    Description       AS DESCRIPTION,
-    CreatedDate       AS CREATED_DATE,
-    LastModifiedDate  AS LAST_MODIFIED_DATE,
-    CURRENT_TIMESTAMP() AS SILVER_LOAD_DATE
-          FROM RAW
-    )
+WITH raw AS (
+
+  SELECT
+    *,
+    {{ source_metadata() }}
+  FROM {{ source('salesforce_bronze', 'campaign') }}
+  WHERE 1=1
+  {{ incremental_filter() }}  
+
+),
+
+cleaned AS (
+
+  SELECT
+    -- PRIMARY KEY
+    id AS campaign_id,
+
+    -- FOREIGN KEYS
+    ownerid AS owner_user_id,
+
+    -- NUMERIC
+    expectedrevenue AS expected_revenue,
+    budgetedcost    AS budgeted_cost,
+    actualcost      AS actual_cost,
+    numbersent      AS number_sent,
+
+    -- DETAILS (strings cleaned)
+    {{ clean_string('name') }}     AS name,
+    {{ clean_string('type') }}     AS entity_type,
+    {{ clean_string('status') }}   AS status,
+    {{ clean_string('description') }}  AS description,
+
+    -- DATES / TIMESTAMPS
+    {{ safe_date('startdate') }}    AS start_date,
+    {{ safe_date('enddate') }}     AS end_date,
+    createddate     AS created_date,
+    lastmodifieddate AS last_modified_date,
+
+    -- METADATA
+    is_deleted,
+
+    -- LOAD / AUDIT
+    current_timestamp()::timestamp_ntz AS silver_load_date,
+
+  FROM raw
+)
 
 SELECT *
-FROM CLEANED
+FROM
+cleaned

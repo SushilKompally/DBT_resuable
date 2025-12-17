@@ -2,29 +2,25 @@
 {% snapshot dim_account_snapshot %}
 {{
   config(
-    target_database='SALESFORCE_DB',
-    target_schema='TEST_GOLD',
-    unique_key='SF_ACCOUNT_ID',
+    unique_key='sf_account_id',
     strategy='timestamp',
     updated_at='last_modified_date',
-    invalidate_hard_deletes=true
   )
 }}
 
-
   SELECT
-    ACCOUNT_ID AS SF_ACCOUNT_ID,
-    NAME,
-    ACCOUNT_NUMBER,
-    ENTITY_TYPE,
-    INDUSTRY,
-    ANNUAL_REVENUE,
-    NUMBER_OF_EMPLOYEES,
-    OWNER_USER_ID,
-    BILLING_CITY,
-    SHIPPING_CITY,
-    CREATED_DATE,
-    LAST_MODIFIED_DATE
+    account_id AS sf_account_id,
+    name,
+    account_number,
+    entity_type,
+    industry,
+    annual_revenue,
+    number_of_employees,
+    owner_user_id,
+    billing_city,
+    shipping_city,
+    created_date,
+    last_modified_date
 FROM {{ ref('account') }}   
 {% endsnapshot %}
 

@@ -7,6 +7,7 @@
 -- Purpose:
 --     This script performs an incremental load from the Bronze layer to the
 --     Silver layer for the acount table in the Salesforce data pipeline.
+-- Data source version: v62.0
 -- Change History:
 --     15-dec-2025 - Initial creation - Sushil Kompally
 */
@@ -23,16 +24,11 @@ WITH raw AS (
      SELECT
         *,
         {{ source_metadata(
-              tool_name='fivetran',
-              record_creation_column='lastmodifieddate'
-          ) }}
+         ) }}
     FROM {{ source('salesforce_bronze', 'account') }}
     WHERE 1=1
-    {{ incremental_filter(
-        source_ts_col='lastmodifieddate',
-        target_ts_col='last_modified_date',
-        lookback_days=1
-    ) }}
+    {{ incremental_filter() 
+    }}
 
 ),
 
@@ -48,7 +44,7 @@ SELECT
 
     -- NUMERIC
     {{ safe_decimal('annualrevenue') }} AS annual_revenue,
-    {{ safe_integer('numberofemployees') }} AS number_of_employees,
+   numberofemployees AS number_of_employees,
 
     -- DETAILS (strings cleaned)
     {{ clean_string('name') }} AS name,
@@ -75,11 +71,14 @@ SELECT
     {{ clean_string('description') }}  AS description,
 
     -- DATES / TIMESTAMPS
-    {{ safe_timestamp_ntz('createddate') }}  AS created_date,
-    {{ safe_timestamp_ntz('lastmodifieddate') }} AS last_modified_date,
+    createddate  AS created_date,
+    lastmodifieddate AS last_modified_date,
 
     -- CREATED BY
     createdbyid AS created_by_id,
+
+     -- LOAD / AUDIT
+    current_timestamp()::timestamp_ntz AS silver_load_date,
 
 FROM raw
 
