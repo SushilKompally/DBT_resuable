@@ -85,3 +85,6 @@ FROM raw
 )
 SELECT *
 FROM cleaned
+
+
+

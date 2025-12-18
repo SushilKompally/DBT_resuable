@@ -1,63 +1,82 @@
+/*
+-- Description: Incremental Load Script for Silver Layer - Contact Table
+-- Script Name: silver_contact.sql
+-- Created on: 16-dec-2025
+-- Author: Sushil Kumar Kompally
+-- Purpose:
+--     Incremental load from Bronze to Silver for the Contact table.
+-- Data source version:
+-- Change History:
+--     16-dec-2025 - Initial creation - Sushil Kompally
+*/
 
-{{ 
-    config(
-        materialized="incremental",
-        unique_key="CONTACT_ID",
-        incremental_strategy="merge",
-        on_schema_change="sync_all_columns",
-    ) 
-}}
+{{ config(
+    unique_key = 'contact_id',
+    incremental_strategy = 'merge',
+) }}
 
-WITH RAW AS (
+WITH raw AS (
 
-    SELECT *
-    FROM {{ source("salesforce_bronze", "contact") }}
+    SELECT
+        *,
+        {{ source_metadata() }}
+    FROM {{ source('salesforce_bronze', 'contact') }}
+    WHERE 1 = 1
+    {{ incremental_filter() }}
 
-    {% if is_incremental() %}
-        WHERE CAST(LASTMODIFIEDDATE AS TIMESTAMP_NTZ) > (
-            SELECT DATEADD(
-                DAY, -1,
-                COALESCE(MAX(LAST_MODIFIED_DATE)::TIMESTAMP_NTZ, '1900-01-01'::TIMESTAMP_NTZ)
-            )
-            FROM {{ this }}
-        )
-        AND 1 = 1
-    {% else %}
-        WHERE 1 = 1
-    {% endif %}
 ),
 
-CLEANED AS (
-    SELECT 
-        Id                  AS CONTACT_ID,
-        AccountId           AS ACCOUNT_ID,
-        FirstName           AS FIRST_NAME,
-        LastName            AS LAST_NAME,
-        Salutation          AS SALUTATION,
-        Title               AS TITLE,
-        Department          AS DEPARTMENT,
-        Email               AS EMAIL,
-        Phone               AS PHONE,
-        MobilePhone         AS MOBILE_PHONE,
-        MailingStreet       AS MAILING_STREET,
-        MailingCity         AS MAILING_CITY,
-        MailingState        AS MAILING_STATE,
-        MailingPostalCode   AS MAILING_POSTAL_CODE,
-        MailingCountry      AS MAILING_COUNTRY,
-        OtherStreet         AS OTHER_STREET,
-        OtherCity           AS OTHER_CITY,
-        OtherState          AS OTHER_STATE,
-        OtherPostalCode     AS OTHER_POSTAL_CODE,
-        OtherCountry        AS OTHER_COUNTRY,
-        LeadSource          AS LEAD_SOURCE,
-        OwnerId             AS OWNER_USER_ID,
-        CreatedDate         AS CREATED_DATE,
-        CreatedById         AS CREATED_BY_ID,
-        LastModifiedDate    AS LAST_MODIFIED_DATE,
-        LastModifiedById    AS LAST_MODIFIED_BY_ID,
-        TO_TIMESTAMP_NTZ(CURRENT_TIMESTAMP()) AS SILVER_LOAD_DATE
-    FROM RAW 
+cleaned AS (
+
+    SELECT
+        -- PRIMARY KEY
+        id AS contact_id,
+
+        -- FOREIGN KEYS
+        accountid AS account_id,
+        ownerid   AS owner_user_id,
+
+        -- PERSONAL DETAILS
+        {{ clean_string('firstname') }}   AS first_name,
+        {{ clean_string('lastname') }}    AS last_name,
+        {{ clean_string('salutation') }}  AS salutation,
+        {{ clean_string('title') }}       AS title,
+        {{ clean_string('department') }}  AS department,
+
+        -- CONTACT DETAILS
+        {{ clean_string('email') }}        AS email,
+        {{ clean_string('phone') }}        AS phone,
+        {{ clean_string('mobilephone') }} AS mobile_phone,
+
+        -- ADDRESS (MAILING)
+        {{ clean_string('mailingstreet') }}      AS mailing_street,
+        {{ clean_string('mailingcity') }}        AS mailing_city,
+        {{ clean_string('mailingstate') }}       AS mailing_state,
+        {{ clean_string('mailingpostalcode') }}  AS mailing_postal_code,
+        {{ clean_string('mailingcountry') }}     AS mailing_country,
+
+        -- ADDRESS (OTHER)
+        {{ clean_string('otherstreet') }}      AS other_street,
+        {{ clean_string('othercity') }}        AS other_city,
+        {{ clean_string('otherstate') }}       AS other_state,
+        {{ clean_string('otherpostalcode') }}  AS other_postal_code,
+        {{ clean_string('othercountry') }}     AS other_country,
+
+        -- SOURCE / METADATA
+        {{ clean_string('leadsource') }} AS lead_source,
+        lastmodifiedbyid   AS last_modified_by_id,
+
+
+        -- AUDIT DATES
+        createddate        AS created_date,
+        createdbyid        AS created_by_id,
+        lastmodifieddate   AS last_modified_date,
+
+        -- AUDIT
+        current_timestamp()::timestamp_ntz AS silver_load_date
+
+    FROM raw
 )
 
 SELECT *
-FROM CLEANED
+FROM cleaned;
