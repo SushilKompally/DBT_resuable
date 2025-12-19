@@ -46,6 +46,17 @@ vars:
     source_record_creation_column: "{{ env_var('RECORD_CREATION_COLUMN', 'lastmodifieddate') }}"
     silver_target_timestamp_col: "{{ env_var('TARGET_TIMESTAMP_COL', 'last_modified_date') }}"
 
+    source_database_name: salesforce_db
+    source_instances:
+      - salesforce1:
+        - source_database_name: salesforce_db
+        - source_schema_name: salesforce1
+        - tool_name: fivetran
+      - salesforce2:
+        - source_database_name: salesforce_db
+        - source_schema_name: salesforce2
+        - tool_name: stitch
+
 models:
   dbt_reusable:
     salesforce:
@@ -60,17 +71,16 @@ models:
         +database:  "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
         +schema: "{{ env_var('DBT_GOLD_SCHEMA', 'TEST_GOLD') }}"
         +materialized: "incremental"
-        +on_schema_change: sync_all_columns
+        +on_schema_change: append_new_columns
         
    
 snapshots:
   dbt_reusable:
     salesforce:
-      gold:
-        target_database: "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
-        target_schema: "{{ env_var('DBT_SNAPSHOT_SCHEMA', 'TEST_GOLD') }}"
-        strategy: timestamp
-        invalidate_hard_deletes: true
+      +target_database: "{{ env_var('DBT_SALESFORCE', 'SALESFORCE') }}"
+      +target_schema: "{{ env_var('DBT_SNAPSHOT_SCHEMA', 'TEST_GOLD') }}"
+      +strategy: timestamp
+      +invalidate_hard_deletes: true
    
 
 

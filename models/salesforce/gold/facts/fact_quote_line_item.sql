@@ -2,7 +2,6 @@
     materialized='incremental',
     incremental_strategy='merge',
     unique_key='SF_QUOTE_LINE_ITEM_ID', 
-    on_schema_change='sync_all_columns'
 ) }}
 
 SELECT

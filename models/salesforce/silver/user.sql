@@ -3,7 +3,6 @@
         materialized="incremental",
         unique_key="USER_ID",
         incremental_strategy="merge",
-        on_schema_change="sync_all_columns",
     )
 }}
 
