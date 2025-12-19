@@ -2,7 +2,7 @@
 version: 2
 
 models:
-  - name: even
+  - name: event
     description: "Silver layer model for Salesforce Task/Event activities."
     config:
       contract:

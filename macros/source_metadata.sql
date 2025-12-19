@@ -8,7 +8,7 @@
     - record_creation_column (string): column/expression representing record creation timestamp (default: 'lastmodifieddate')
   
 ------------------------------------------------------------------------------#}
-{% macro source_metadata(tool_name="fivetran", record_creation_column="lastmodifieddate") -%}
+{% macro source_metadata(tool_name=var('tool_name'), record_creation_column="lastmodifieddate") -%}
 
   {# Normalize and validate tool_name #}
   {% set tool_name_lc = tool_name | lower %}

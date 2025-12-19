@@ -2,10 +2,11 @@ version: 2
  
 sources:
   - name: salesforce_bronze
-    database:  salesforce_db  
+    database:  '{{ var("source_database_name") }}'
     schema: bronze        
     tables:
       - name: account
+        identifier: account
       - name: campaign
       - name: user
       - name: userrole

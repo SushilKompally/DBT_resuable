@@ -5,7 +5,6 @@
     materialized='incremental',
     incremental_strategy='merge',
     unique_key='SF_OPPORTUNITY_ID',
-    on_schema_change='sync_all_columns'
 ) }}
 
 
