@@ -1,4 +1,3 @@
-
 /*
 -- Description: Incremental Load Script for Silver Layer - campaign Table
 -- Script Name: silver_campaign.sql
@@ -18,54 +17,11 @@
     on_schema_change='append_new_columns'
 ) }}
 
-
-WITH raw AS (
-
-  SELECT
-    *,
-    {{ source_metadata() }}
-  FROM {{ source('salesforce_bronze', 'campaign') }}
-  WHERE 1=1
-  {{ incremental_filter() }}  
-
-),
-
-cleaned AS (
-
-  SELECT
-    -- PRIMARY KEY
-    id AS campaign_id,
-
-    -- FOREIGN KEYS
-    ownerid AS owner_user_id,
-
-    -- NUMERIC
-    expectedrevenue AS expected_revenue,
-    budgetedcost    AS budgeted_cost,
-    actualcost      AS actual_cost,
-    numbersent      AS number_sent,
-
-    -- DETAILS (strings cleaned)
-    {{ clean_string('name') }}     AS name,
-    {{ clean_string('type') }}     AS entity_type,
-    {{ clean_string('status') }}   AS status,
-    {{ clean_string('description') }}  AS description,
-
-    -- DATES / TIMESTAMPS
-    {{ safe_date('startdate') }}    AS start_date,
-    {{ safe_date('enddate') }}     AS end_date,
-    createddate     AS created_date,
-    lastmodifieddate AS last_modified_date,
-
-    -- METADATA
-    is_deleted,
-
-    -- LOAD / AUDIT
-    current_timestamp()::timestamp_ntz AS silver_load_date,
-
-  FROM raw
+WITH consolidated AS (
+    SELECT * FROM { ref('campaign__salesforce1') }
+    UNION ALL
+    SELECT * FROM { ref('campaign__salesforce2') }
 )
 
 SELECT *
-FROM
-cleaned
+FROM consolidated

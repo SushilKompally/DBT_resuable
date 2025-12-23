@@ -1,4 +1,3 @@
-
 /*
 -- Description: Incremental Load Script for Silver Layer - event table
 -- Script Name: event_silver.sql
@@ -16,43 +15,11 @@
     incremental_strategy='merge',
 ) }}
 
-WITH raw AS (
-
-    SELECT
-        *,
-        {{ source_metadata() }}                                  
-    FROM {{ source('salesforce_bronze', 'task_event') }}
-    WHERE 1=1
-  {{ incremental_filter() }}  
-
-),
-
-cleaned AS (
-
-    SELECT
-        -- PRIMARY KEY
-        id                                 AS activity_id,
-
-        -- FOREIGN KEYS
-        ownerid                            AS owner_user_id,
-        whoid                              AS who_id,
-        whatid                             AS what_id,
-
-        -- DETAILS (strings cleaned)
-        {{ clean_string('subject') }}      AS subject,
-        {{ clean_string('description') }}  AS description,
-
-        -- DATES / TIMESTAMPS (Snowflake-safe)
-        createddate      AS created_date,
-        lastmodifieddate AS last_modified_date,
-        activitydate      AS activity_date,
-
-        -- FLAGS / METADATA
-        isdeleted                         AS is_deleted,
-        current_timestamp()::timestamp_ntz AS silver_load_date
-    FROM raw
+WITH consolidated AS (
+    SELECT * FROM { ref('event__salesforce1') }
+    UNION ALL
+    SELECT * FROM { ref('event__salesforce2') }
 )
 
 SELECT *
-FROM cleaned
-
+FROM consolidated

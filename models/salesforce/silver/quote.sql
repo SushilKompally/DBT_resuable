@@ -59,3 +59,12 @@ WITH RAW AS (
 
 SELECT *
 FROM CLEANED
+
+WITH consolidated AS (
+    SELECT * FROM { ref('quote__salesforce1') }
+    UNION ALL
+    SELECT * FROM { ref('quote__salesforce2') }
+)
+
+SELECT *
+FROM consolidated
