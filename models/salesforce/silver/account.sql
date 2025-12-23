@@ -13,16 +13,18 @@
 
 
 
+
+
+-- models/salesforce/silver/account.sql
 {{ config(
-    unique_key='account_id',
-    incremental_strategy='merge',
+    materialized = 'view',
+    
 ) }}
 
 WITH consolidated AS (
-    SELECT * FROM { ref('account__salesforce1') }
+    SELECT * FROM {{ ref('account__salesforce1') }}
     UNION ALL
-    SELECT * FROM { ref('account__salesforce2') }
+    SELECT * FROM {{ ref('account__salesforce2') }}
 )
-
 SELECT *
 FROM consolidated

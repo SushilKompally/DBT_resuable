@@ -13,10 +13,11 @@
 */
 
 
-
 {{ config(
     unique_key='account_id',
     incremental_strategy='merge',
+    materialized='ephemeral',
+    on_schema_change='sync_all_columns'
 ) }}
 
 WITH raw AS (
