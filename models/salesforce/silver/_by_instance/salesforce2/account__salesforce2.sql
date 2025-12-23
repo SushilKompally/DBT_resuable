@@ -17,6 +17,8 @@
 {{ config(
     unique_key='account_id',
     incremental_strategy='merge',
+    materialized='ephemeral',
+    on_schema_change='sync_all_columns'
 ) }}
 
 WITH raw AS (
@@ -74,11 +76,12 @@ SELECT
     createddate  AS created_date,
     lastmodifieddate AS last_modified_date,
 
+
     -- CREATED BY
     createdbyid AS created_by_id,
 
      -- LOAD / AUDIT
-    current_timestamp()::timestamp_ntz AS silver_load_date,
+    current_timestamp()::timestamp_ntz AS silver_load_date
 
 FROM raw
 

@@ -35,28 +35,30 @@ clean-targets: # directories to be removed by `dbt clean`
 
 
  
-# Global variables (vars) 
+
 
 vars:
-    tool_name: "{{ env_var('TOOL_NAME', 'fivetran') }}"
-    record_creation_column:  "{{ env_var('RECORD_CREATION_COLUMN', 'lastmodifieddate') }}"
+  # Global tool vars
+  tool_name: "{{ env_var('TOOL_NAME', 'fivetran') }}"
+  record_creation_column: "{{ env_var('RECORD_CREATION_COLUMN', 'lastmodifieddate') }}"
 
-# Incremental filter (vars)
+  # Incremental filter vars
+  source_record_creation_column: "{{ env_var('RECORD_CREATION_COLUMN', 'lastmodifieddate') }}"
+  silver_target_timestamp_col: "{{ env_var('TARGET_TIMESTAMP_COL', 'last_modified_date') }}"
 
-    source_record_creation_column: "{{ env_var('RECORD_CREATION_COLUMN', 'lastmodifieddate') }}"
-    silver_target_timestamp_col: "{{ env_var('TARGET_TIMESTAMP_COL', 'last_modified_date') }}"
+  # for {{ var('source_database_name') }}
+  source_database_name: "salesforce_db"
+
   
-    salesforce:
-      source_database_name: salesforce_db
-      source_instances:
-        - salesforce1:
-            source_database_name: salesforce_db
-            source_schema_name: salesforce1
-            tool_name: fivetran
-        - salesforce2:
-            source_database_name: salesforce_db
-            source_schema_name: salesforce2
-            tool_name: stitch
+  source_instances:
+    - name: "salesforce1"
+      source_database_name: "salesforce_db"
+      source_schema_name: "test"
+      tool_name: "fivetran"
+    - name: "salesforce2"
+      source_database_name: "salesforce_db"
+      source_schema_name: "test"
+      tool_name: "stitch"
 
 models:
   dbt_reusable:
