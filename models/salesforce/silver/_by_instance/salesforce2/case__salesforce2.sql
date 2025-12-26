@@ -1,11 +1,20 @@
 {{ config(
-    materialized = 'table'
+    materialized = 'ephemeral',
+    incremental_strategy = 'merge',
+    on_schema_change = 'sync_all_columns'
 ) }}
 
-SELECT *
-FROM {{ source('salesforcesalesforce2', 'case') }}
-{% if execute %}
-    {% if var('start_date') %}
-        WHERE {{ var('record_creation_column', 'LastModifiedDate') }} >= '{{ var('start_date') }}'
-    {% endif %}
-{% endif %}
+WITH raw AS (
+    SELECT
+        *,
+        {{ source_metadata() }}
+    FROM {{ source('salesforcesalesforce2', 'case') }}
+    WHERE 1=1
+    {{ incremental_filter() }}
+),
+
+cleaned AS (
+    SELECT * FROM raw
+)
+
+SELECT * FROM cleaned

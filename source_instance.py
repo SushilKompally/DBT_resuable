@@ -218,72 +218,64 @@ def list_template_files(templates_dir: Path) -> List[Path]:
     return [f for f in files if f.parent == templates_dir]
 
 
-def copy_and_render_templates_per_instance(
-    templates_dir: Path,
+def generate_ephemeral_per_instance_models(
     out_dir: Path,
     instance_name: str,
     by_instance_subdir: str,
+    table_names: List[str],
     overwrite: bool = False,
 ):
-    # Debug: show what we see
-    print(f"[debug] Probing templates in: {templates_dir}")
-    files = list_template_files(templates_dir)
-    print(f"[debug] Found {len(files)} template files: {[f.name for f in files]}")
-
-    # Fallback: if empty, try sibling 'silver' of 'templates'
-    if not files:
-        alt = templates_dir.parent / "silver"
-        if alt.exists():
-            alt_files = list_template_files(alt)
-            if alt_files:
-                print(f"[info] No templates in {templates_dir}. Using fallback: {alt}")
-                templates_dir = alt
-                files = alt_files
-                print(f"[debug] Found {len(files)} template files in fallback: {[f.name for f in files]}")
-
-    if not files:
-        raise FileNotFoundError(
-            f"No template files found in {templates_dir}. "
-            f"Expecting files like account.sql.tpl, contact.sql.tpl, or plain .sql."
-        )
-
+    """
+    Generate ephemeral per-instance models with RAW/CLEANED structure.
+    Does not rely on templates—creates the structure automatically.
+    """
     inst_dir = out_dir / by_instance_subdir / instance_name
     ensure_dir(inst_dir)
 
-    for tpl in files:
-        content = tpl.read_text(encoding="utf-8")
-        rendered = substitute_instance_token(content, instance_name)
-        
-        # Add materialized='ephemeral' for multiple instances
-        rendered = add_ephemeral_materialization(rendered)
-
-        base_name = tpl.name
-        # normalize to .sql filename and add instance suffix to the stem
-        # e.g., account.sql.tpl -> account__salesforce1.sql
-        stem = stem_from_template_name(base_name)
-        target_name = f"{stem}__{instance_name}.sql"
+    for table_name in table_names:
+        target_name = f"{table_name}__{instance_name}.sql"
         target_path = inst_dir / target_name
 
-        write_text(target_path, rendered, overwrite=overwrite)
+        # Generate ephemeral model with RAW/CLEANED structure
+        # Note: Use {{ and }} for Jinja (not f-string braces)
+        ephemeral_model = """{{ config(
+    materialized = 'ephemeral',
+    incremental_strategy = 'merge',
+    on_schema_change = 'sync_all_columns'
+) }}
+
+WITH raw AS (
+    SELECT
+        *,
+        {{ source_metadata() }}
+    FROM {{ source('salesforce""" + instance_name + """', '""" + table_name + """') }}
+    WHERE 1=1
+    {{ incremental_filter() }}
+),
+
+cleaned AS (
+    SELECT * FROM raw
+)
+
+SELECT * FROM cleaned"""
+
+        write_text(target_path, ephemeral_model, overwrite=overwrite)
 
 
 
-def generate_consolidated_model(
-    templates_dir: Path,
+def generate_consolidated_models(
     out_dir: Path,
     instance_names: List[str],
+    table_names: List[str],
     overwrite: bool = False,
 ):
     """
-    Generate consolidated silver models that UNION ALL per-instance models.
-    Produces clean output with single header and materialized = 'view'.
+    Generate consolidated silver models that UNION ALL per-instance ephemeral models.
+    Produces clean output with materialized = 'view'.
     """
-
     if len(instance_names) <= 1:
         print("[info] Single instance detected. Skipping consolidation.")
         return
-
-    files = list_template_files(templates_dir)
 
     # Deduplicate instance names and preserve order
     seen = set()
@@ -293,35 +285,28 @@ def generate_consolidated_model(
             seen.add(i)
             deduped_instances.append(i)
 
-    for tpl in files:
-        stem = stem_from_template_name(tpl.name)
-        target_path = out_dir / f"{stem}.sql"
+    for table_name in table_names:
+        target_path = out_dir / f"{table_name}.sql"
 
-        template_text = tpl.read_text(encoding="utf-8")
-        
-        # Extract the description header only (comments before config)
-        description_header = _extract_description_header(template_text)
-        
-        # Build clean config with just materialized = 'view'
-        clean_config = "{{ config(\n    materialized = 'view'\n) }}"
-
-        # Build union lines with proper Jinja2 syntax (use quadruple braces to escape in f-string)
+        # Build union lines with proper Jinja2 syntax
         union_lines = []
         for inst in deduped_instances:
-            union_lines.append(f"    SELECT * FROM {{{{ ref('{stem}__{inst}') }}}}")
+            union_lines.append(f"    SELECT * FROM {{{{ ref('{table_name}__{inst}') }}}}")
         union_sql = "\n    UNION ALL\n".join(union_lines)
 
-        consolidated_sql = f"""{description_header}
-{clean_config}
+        # Use string concatenation to avoid f-string brace escaping issues
+        consolidated_sql = """{{ config(
+    materialized = 'view'
+) }}
 
 WITH consolidated AS (
-{union_sql}
+""" + union_sql + """
 )
 
 SELECT *
 FROM consolidated"""
 
-        write_text(target_path, consolidated_sql.strip(), overwrite=True)
+        write_text(target_path, consolidated_sql.strip(), overwrite=overwrite)
 
 
 def _extract_description_header(template_text: str) -> str:
@@ -376,15 +361,6 @@ def extract_header_until_config(template_text: str) -> str:
     return "\n".join(out)
 
 
-    # The following code block was incorrectly indented and unreachable.
-    # It should be part of generate_consolidated_model, not here.
-
-
-
-    # The following code block was incorrectly indented and unreachable.
-    # It should be part of generate_consolidated_model, not here.
-
-
 
 def main():
     parser = argparse.ArgumentParser(description="Generate silver models per source instance + consolidated union models.")
@@ -435,36 +411,47 @@ def main():
     # Ensure base output dirs
     ensure_dir(out_dir)
 
-    # 1) Generate per-instance models (skip if only one instance)
+    # Detect table names from plain .sql files in templates_dir
+    table_names = []
+    for sql_file in templates_dir.glob("*.sql"):
+        if sql_file.parent == templates_dir:  # Only direct children, not subdirs
+            stem = sql_file.stem
+            # Skip if this is a per-instance or consolidated model (check for __)
+            if "__" not in stem:
+                table_names.append(stem)
+    
+    table_names = sorted(set(table_names))  # Deduplicate and sort
+    print(f"[info] Tables detected: {', '.join(table_names)}")
+
+    # 1) Generate per-instance ephemeral models (skip if only one instance)
     if len(instance_names) > 1:
         ensure_dir(out_dir / args.by_instance_subdir)
         for inst in instance_names:
-            print(f"[info] Generating per-instance models for: {inst}")
-            copy_and_render_templates_per_instance(
-                templates_dir=templates_dir,
+            print(f"[info] Generating ephemeral per-instance models for: {inst}")
+            generate_ephemeral_per_instance_models(
                 out_dir=out_dir,
                 instance_name=inst,
                 by_instance_subdir=args.by_instance_subdir,
+                table_names=table_names,
                 overwrite=True,  # Always overwrite generated per-instance models
             )
     else:
         print(f"[info] Skipping per-instance model generation ({len(instance_names)} instance detected).")
 
-   # 2) Generate consolidated union models ONLY if multiple instances exist
+    # 2) Generate consolidated union models ONLY if multiple instances exist
     if len(instance_names) > 1:
-     print("[info] Multiple instances detected. Generating consolidated models (UNION ALL)...")
-     generate_consolidated_model(
-         templates_dir=templates_dir,
-         out_dir=out_dir,
-         instance_names=instance_names,
-         overwrite=True,  # explicitly overwrite standard models
-       )
+        print("[info] Multiple instances detected. Generating consolidated models (UNION ALL)...")
+        generate_consolidated_models(
+            out_dir=out_dir,
+            instance_names=instance_names,
+            table_names=table_names,
+            overwrite=True,
+        )
     else:
-     print(
-        "[info] Single instance detected. "
-        "Skipping consolidated model generation to preserve standard silver models."
-    )
-
+        print(
+            "[info] Single instance detected. "
+            "Skipping consolidated model generation to preserve standard silver models."
+        )
 
     print("[done] Silver model generation complete.")
 
