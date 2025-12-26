@@ -10,15 +10,8 @@
 -- Change History:
 --     15-dec-2025 - Initial creation - Sushil Kompally
 */
-
-
-
-
-
--- models/salesforce/silver/account.sql
 {{ config(
-    materialized = 'view',
-    
+    materialized = 'view'
 ) }}
 
 WITH consolidated AS (
@@ -26,5 +19,6 @@ WITH consolidated AS (
     UNION ALL
     SELECT * FROM {{ ref('account__salesforce2') }}
 )
+
 SELECT *
 FROM consolidated

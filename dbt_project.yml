@@ -53,11 +53,11 @@ vars:
   source_instances:
     - name: "salesforce1"
       source_database_name: "salesforce_db"
-      source_schema_name: "test"
+      source_schema_name: "salesforce1"
       tool_name: "fivetran"
     - name: "salesforce2"
       source_database_name: "salesforce_db"
-      source_schema_name: "test"
+      source_schema_name: "salesforce2"
       tool_name: "stitch"
 
 models:

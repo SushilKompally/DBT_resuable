@@ -16,7 +16,7 @@
 ) }}
 
 SELECT *
-FROM {{ source('salesforcesalesforce2', 'account') }}
+FROM {{ source('salesforce__INSTANCE__', 'account') }}
 {% if execute %}
     {% if var('start_date') %}
         WHERE {{ var('record_creation_column', 'LastModifiedDate') }} >= '{{ var('start_date') }}'

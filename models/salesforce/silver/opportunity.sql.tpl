@@ -3,7 +3,7 @@
 ) }}
 
 SELECT *
-FROM {{ source('salesforcesalesforce1', 'opportunity') }}
+FROM {{ source('salesforce__INSTANCE__', 'opportunity') }}
 {% if execute %}
     {% if var('start_date') %}
         WHERE {{ var('record_creation_column', 'LastModifiedDate') }} >= '{{ var('start_date') }}'

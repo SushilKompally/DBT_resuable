@@ -196,12 +196,26 @@ def write_text(path: Path, content: str, overwrite: bool = False):
 
 
 def list_template_files(templates_dir: Path) -> List[Path]:
-    # Support both .sql.tpl/.tpl and plain .sql as templates
-    patterns = ["*.sql.tpl", "*.sql.tmpl", "*.tpl", "*.sql"]
+    """
+    Support both .sql.tpl/.tpl and plain .sql as templates.
+    Prioritizes .sql.tpl files and excludes plain .sql files if .sql.tpl exists.
+    """
     files: List[Path] = []
-    for pat in patterns:
-        files.extend(list(templates_dir.glob(pat)))
-    return files
+    
+    # First, collect .sql.tpl and .sql.tmpl and .tpl files (explicit templates)
+    tpl_patterns = ["*.sql.tpl", "*.sql.tmpl", "*.tpl"]
+    tpl_files: List[Path] = []
+    for pat in tpl_patterns:
+        tpl_files.extend(list(templates_dir.glob(pat)))
+    
+    if tpl_files:
+        # If we found explicit template files, use those only
+        return tpl_files
+    
+    # Fallback: if no explicit templates, use plain .sql files
+    files.extend(list(templates_dir.glob("*.sql")))
+    # Exclude files that are in subdirectories (like _by_instance)
+    return [f for f in files if f.parent == templates_dir]
 
 
 def copy_and_render_templates_per_instance(
@@ -261,9 +275,8 @@ def generate_consolidated_model(
     overwrite: bool = False,
 ):
     """
-    Generate consolidated silver models that UNION ALL per-instance models
-    while preserving config, comments, and structure.
-    Adds materialized = 'view' for consolidated models.
+    Generate consolidated silver models that UNION ALL per-instance models.
+    Produces clean output with single header and materialized = 'view'.
     """
 
     if len(instance_names) <= 1:
@@ -285,56 +298,65 @@ def generate_consolidated_model(
         target_path = out_dir / f"{stem}.sql"
 
         template_text = tpl.read_text(encoding="utf-8")
-        header = extract_header_until_config(template_text)
-        # Ensure materialized = 'view' exists in the header (idempotent)
-        header_with_materialization = add_view_materialization(header)
+        
+        # Extract the description header only (comments before config)
+        description_header = _extract_description_header(template_text)
+        
+        # Build clean config with just materialized = 'view'
+        clean_config = "{{ config(\n    materialized = 'view'\n) }}"
 
-        union_lines = [f"    SELECT * FROM {{ ref('{stem}__{inst}') }}" for inst in deduped_instances]
+        # Build union lines with proper Jinja2 syntax (use quadruple braces to escape in f-string)
+        union_lines = []
+        for inst in deduped_instances:
+            union_lines.append(f"    SELECT * FROM {{{{ ref('{stem}__{inst}') }}}}")
         union_sql = "\n    UNION ALL\n".join(union_lines)
 
-        consolidated_sql = f"""
-{header_with_materialization}
+        consolidated_sql = f"""{description_header}
+{clean_config}
 
 WITH consolidated AS (
 {union_sql}
 )
 
 SELECT *
-FROM consolidated
-"""
+FROM consolidated"""
 
-        # If the target exists, try to replace the existing consolidated CTE block
-        if target_path.exists():
-            existing = target_path.read_text(encoding="utf-8")
-            updated, replaced = _replace_consolidated_block(existing, header_with_materialization, union_sql)
-            if replaced:
-                write_text(target_path, updated, overwrite=True)
-            else:
-                # No recognizable block to replace, overwrite with generated content
-                write_text(target_path, consolidated_sql.strip(), overwrite=True)
+        write_text(target_path, consolidated_sql.strip(), overwrite=True)
+
+
+def _extract_description_header(template_text: str) -> str:
+    """
+    Extract only the description comments at the top of the file.
+    Stops at the first non-comment, non-blank line (like config or SELECT).
+    """
+    lines = template_text.splitlines()
+    header_lines = []
+    in_comment_block = False
+    
+    for line in lines:
+        stripped = line.strip()
+        
+        # Start of comment block
+        if stripped.startswith("/*"):
+            in_comment_block = True
+            header_lines.append(line)
+        # Inside comment block
+        elif in_comment_block:
+            header_lines.append(line)
+            if stripped.endswith("*/"):
+                in_comment_block = False
+                break
+        # Skip blank lines after comment block ends
+        elif not stripped:
+            continue
+        # Stop at first non-comment, non-blank line
         else:
-            write_text(target_path, consolidated_sql.strip(), overwrite=overwrite)
+            break
+    
+    return "\n".join(header_lines)
 
 
-def _replace_consolidated_block(existing_text: str, header_with_materialization: str, new_union_sql: str) -> (str, bool):
-    """
-    Replace the existing WITH consolidated AS ( ... ) block in `existing_text` with a new union built from
-    `new_union_sql`. Returns (updated_text, replaced_flag).
-    This keeps existing comments/header if possible and ensures idempotence.
-    """
-    # Build a regex that finds the consolidated CTE and the following SELECT * FROM consolidated
-    pattern = re.compile(r"(WITH\s+consolidated\s+AS\s*\().*?(\)\s*SELECT\s+\*\s+FROM\s+consolidated)", re.DOTALL | re.IGNORECASE)
 
-    replacement = f"WITH consolidated AS (\n{new_union_sql}\n)\n\nSELECT *\nFROM consolidated"
-
-    if pattern.search(existing_text):
-        updated = pattern.sub(replacement, existing_text)
-        # Ensure header_with_materialization appears at the top; if not, prepend it
-        if header_with_materialization.strip() and header_with_materialization.strip() not in updated:
-            updated = header_with_materialization.rstrip() + "\n\n" + updated.lstrip()
-        return updated, True
-
-    return existing_text, False
 
 def extract_header_until_config(template_text: str) -> str:
     """
@@ -352,6 +374,10 @@ def extract_header_until_config(template_text: str) -> str:
             break
 
     return "\n".join(out)
+
+
+    # The following code block was incorrectly indented and unreachable.
+    # It should be part of generate_consolidated_model, not here.
 
 
 
@@ -419,7 +445,7 @@ def main():
                 out_dir=out_dir,
                 instance_name=inst,
                 by_instance_subdir=args.by_instance_subdir,
-                overwrite=args.overwrite,
+                overwrite=True,  # Always overwrite generated per-instance models
             )
     else:
         print(f"[info] Skipping per-instance model generation ({len(instance_names)} instance detected).")
