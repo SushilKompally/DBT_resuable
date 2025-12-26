@@ -116,14 +116,16 @@ def _normalize_instances(si: Any) -> List[Dict[str, Any]]:
 
 
 def extract_salesforce_config(project: Dict[str, Any]) -> Dict[str, Any]:
-    salesforce = (project.get("vars", {}) or {}).get("salesforce", {}) or {}
+    vars_dict = project.get("vars", {}) or {}
+    salesforce = vars_dict.get("salesforce", {}) or {}
 
     defaults = {
-        "source_database_name": salesforce.get("source_database_name"),
-        "source_schema_prefix": salesforce.get("source_schema_prefix"),
+        "source_database_name": salesforce.get("source_database_name") or vars_dict.get("source_database_name"),
+        "source_schema_prefix": salesforce.get("source_schema_prefix") or vars_dict.get("source_schema_prefix"),
     }
 
-    si = salesforce.get("source_instances")
+    # Look for source_instances in salesforce first, then in vars root
+    si = salesforce.get("source_instances") or vars_dict.get("source_instances")
     instances = _normalize_instances(si) if si is not None else []
 
     return {"source_instances": instances, "defaults": defaults}
@@ -133,6 +135,38 @@ def substitute_instance_token(text: str, instance_name: str) -> str:
     replaced = text.replace("__INSTANCE__", instance_name)
     replaced = re.sub(r"salesforce__\s*__INSTANCE__", f"salesforce__{instance_name}", replaced)
     return replaced
+
+
+def add_ephemeral_materialization(text: str) -> str:
+    """
+    Add materialized='ephemeral' to the config block if it doesn't already exist.
+    """
+    if "materialized" in text:
+        return text
+    
+    # Find the config block and add materialized='ephemeral'
+    text = re.sub(
+        r"(\{\{\s*config\s*\()",
+        r"\1materialized='ephemeral', ",
+        text
+    )
+    return text
+
+
+def add_view_materialization(text: str) -> str:
+    """
+    Add materialized = 'view' to the config block if it doesn't already exist.
+    """
+    if "materialized" in text:
+        return text
+    
+    # Find the config block and add materialized = 'view'
+    text = re.sub(
+        r"(\{\{\s*config\s*\()",
+        r"\1materialized = 'view', ",
+        text
+    )
+    return text
 
 
 def ensure_dir(path: Path):
@@ -205,6 +239,9 @@ def copy_and_render_templates_per_instance(
     for tpl in files:
         content = tpl.read_text(encoding="utf-8")
         rendered = substitute_instance_token(content, instance_name)
+        
+        # Add materialized='ephemeral' for multiple instances
+        rendered = add_ephemeral_materialization(rendered)
 
         base_name = tpl.name
         # normalize to .sql filename and add instance suffix to the stem
@@ -226,6 +263,7 @@ def generate_consolidated_model(
     """
     Generate consolidated silver models that UNION ALL per-instance models
     while preserving config, comments, and structure.
+    Adds materialized = 'view' for consolidated models.
     """
 
     if len(instance_names) <= 1:
@@ -234,20 +272,28 @@ def generate_consolidated_model(
 
     files = list_template_files(templates_dir)
 
+    # Deduplicate instance names and preserve order
+    seen = set()
+    deduped_instances: List[str] = []
+    for i in instance_names:
+        if i not in seen:
+            seen.add(i)
+            deduped_instances.append(i)
+
     for tpl in files:
         stem = stem_from_template_name(tpl.name)
         target_path = out_dir / f"{stem}.sql"
 
         template_text = tpl.read_text(encoding="utf-8")
         header = extract_header_until_config(template_text)
+        # Ensure materialized = 'view' exists in the header (idempotent)
+        header_with_materialization = add_view_materialization(header)
 
-        union_sql = "\n    UNION ALL\n".join(
-            f"    SELECT * FROM {{ ref('{stem}__{inst}') }}"
-            for inst in instance_names
-        )
+        union_lines = [f"    SELECT * FROM {{ ref('{stem}__{inst}') }}" for inst in deduped_instances]
+        union_sql = "\n    UNION ALL\n".join(union_lines)
 
         consolidated_sql = f"""
-{header}
+{header_with_materialization}
 
 WITH consolidated AS (
 {union_sql}
@@ -257,7 +303,38 @@ SELECT *
 FROM consolidated
 """
 
-        write_text(target_path, consolidated_sql.strip(), overwrite=overwrite)
+        # If the target exists, try to replace the existing consolidated CTE block
+        if target_path.exists():
+            existing = target_path.read_text(encoding="utf-8")
+            updated, replaced = _replace_consolidated_block(existing, header_with_materialization, union_sql)
+            if replaced:
+                write_text(target_path, updated, overwrite=True)
+            else:
+                # No recognizable block to replace, overwrite with generated content
+                write_text(target_path, consolidated_sql.strip(), overwrite=True)
+        else:
+            write_text(target_path, consolidated_sql.strip(), overwrite=overwrite)
+
+
+def _replace_consolidated_block(existing_text: str, header_with_materialization: str, new_union_sql: str) -> (str, bool):
+    """
+    Replace the existing WITH consolidated AS ( ... ) block in `existing_text` with a new union built from
+    `new_union_sql`. Returns (updated_text, replaced_flag).
+    This keeps existing comments/header if possible and ensures idempotence.
+    """
+    # Build a regex that finds the consolidated CTE and the following SELECT * FROM consolidated
+    pattern = re.compile(r"(WITH\s+consolidated\s+AS\s*\().*?(\)\s*SELECT\s+\*\s+FROM\s+consolidated)", re.DOTALL | re.IGNORECASE)
+
+    replacement = f"WITH consolidated AS (\n{new_union_sql}\n)\n\nSELECT *\nFROM consolidated"
+
+    if pattern.search(existing_text):
+        updated = pattern.sub(replacement, existing_text)
+        # Ensure header_with_materialization appears at the top; if not, prepend it
+        if header_with_materialization.strip() and header_with_materialization.strip() not in updated:
+            updated = header_with_materialization.rstrip() + "\n\n" + updated.lstrip()
+        return updated, True
+
+    return existing_text, False
 
 def extract_header_until_config(template_text: str) -> str:
     """
